@@ -23,12 +23,13 @@ const char *vertexShaderSource = "#version 330 core\n"
 const char *fragmentShaderSource = "#version 330 core\n"
     "out vec4 FragColor;\n"
     "void main() {\n"
-    "   FragColor = vec4(0.0f, 5.0f, 3.0f, 1.0f);\n"
+    "   FragColor = vec4(0.8f, 5.0f, 3.0f, 1.0f);\n"
     "}\0";
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
-
 void buildSphere(int sectorCount, int stackCount, float radius);
+void processInput(GLFWwindow *window);
+void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 
 float FOV = 45.0f;
 
@@ -37,6 +38,23 @@ float PI = 3.14159265359f;
 std::vector<float> vertices;
 std::vector<int> indices;
 std::vector<int> lineIndices;
+
+glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
+glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
+
+float deltaTime = 0.0f;
+float lastFrame = 0.0f;
+
+float lastX = 400.0f;
+float lastY = 300.0f;
+
+const float sensitivity = 0.1f;
+
+float yaw = -90.0f;
+float pitch = 0.0f;
+
+bool firstMouse = true;
 
 int main()
 {
@@ -63,6 +81,8 @@ int main()
     }
     glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, mouse_callback);
 
     // OPENGL TESTING
     glEnable(GL_DEPTH_TEST);
@@ -127,12 +147,19 @@ int main()
     
     while (!glfwWindowShouldClose(window))
     {
+        float currentFrame = glfwGetTime();
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        processInput(window);
 
         model = glm::mat4(1.0f);
         float rotation = float(glfwGetTime()) * 0.1f;
         model = glm::rotate(model, glm::radians(rotation), glm::vec3(0.0f, 0.5f, 0.2f));
+        view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp); 
 
         glUseProgram(shaderProgram);
         glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(model));
@@ -141,6 +168,7 @@ int main()
 
         glBindVertexArray(VAO);
         glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
+
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
@@ -214,4 +242,62 @@ void buildSphere(int sectorCount, int stackCount, float radius)
             }
         }
     }
+    std::cout << "===CREATED_A_SPHERE===\n";
+    std::cout << "Radius: " << radius << '\n';
+    std::cout << "Sector count: " << sectorCount << '\n';
+    std::cout << "Stack count: " << stackCount << '\n';
+    std::cout << "======================\n";
+}
+
+void processInput(GLFWwindow *window)
+{
+    const float cameraSpeed = 2.5f;
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+    {
+        cameraPos += cameraSpeed * cameraFront * deltaTime;
+    }
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+    {
+        cameraPos -= cameraSpeed * cameraFront * deltaTime;
+    }
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+    {
+        cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed * deltaTime;
+    }   
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+    {
+        cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed * deltaTime;
+    }
+}
+
+void mouse_callback(GLFWwindow *window, double xpos, double ypos)
+{
+    if (firstMouse)
+    {
+        lastX = xpos;
+        lastY = ypos;
+        firstMouse = false;
+    }
+
+    float xoffset = xpos - lastX;
+    float yoffset = lastY - ypos;
+    lastX = xpos;
+    lastY = ypos;
+
+    xoffset *= sensitivity;
+    yoffset *= sensitivity;
+
+    yaw += xoffset;
+    pitch += yoffset;
+
+    if (pitch > 89.0f)
+        pitch = 89.0f;
+    if (pitch < -89.0f)
+        pitch = -89.0f;
+
+    glm::vec3 direction;
+    direction.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+    direction.y = sin(glm::radians(pitch));
+    direction.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+    cameraFront = glm::normalize(direction);
 }
